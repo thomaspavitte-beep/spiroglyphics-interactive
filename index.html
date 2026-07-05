@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Spiroglyphics &middot; Scroll to Draw</title>
+<style>
+  :root{ --ink:#111418; --bg:#fbfbf9; --accent:#e4572e; --muted:#8a9099;
+    --spiro-ink:#231f20;   /* the pen colour */
+    --ghost:#e2e5e9; }     /* the printed grey guide spiral */
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;}
+  #track{height:700vh;position:relative;}
+  #stage{position:sticky;top:0;height:100vh;height:100svh;display:flex;align-items:center;
+    justify-content:center;overflow:hidden;}
+  #art{width:min(92vw,calc(90svh * var(--ar,1)));display:block;}
+
+  /* the printed guide: faint grey, fades away once the line is inked */
+  #ghost{fill:var(--ghost);transition:opacity .3s linear;}
+  /* the inked line: revealed along the spiral by the scroll-driven mask */
+  #inked{fill:var(--spiro-ink);transition:fill .5s ease;}
+  body.noguide #ghost{opacity:0 !important;}
+  @media (prefers-reduced-motion: reduce){
+    #ghost,#inked{transition:none;}
+  }
+
+  #bar{position:fixed;left:0;top:0;height:3px;width:0%;background:var(--accent);z-index:5;}
+  #hud{position:fixed;left:0;right:0;top:0;padding:16px 20px;display:flex;align-items:baseline;gap:14px;pointer-events:none;z-index:4;}
+  #title{font-size:15px;font-weight:700;}
+  #title span{font-weight:400;color:var(--muted);}
+  #credit{font-size:11px;color:var(--muted);}
+  #count{margin-left:auto;font-variant-numeric:tabular-nums;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;}
+  @media (max-width:600px){
+    #title span,#credit{display:none;}
+  }
+  #btns{position:fixed;right:20px;bottom:22px;z-index:6;display:flex;gap:8px;}
+  #btns button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:#fff;
+    border:1px solid #d7dbe0;border-radius:999px;padding:7px 14px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  #btns button:hover{border-color:var(--accent);color:var(--accent);}
+  #hint{position:fixed;left:0;right:0;bottom:26px;text-align:center;font-size:13px;color:var(--muted);transition:opacity .4s;pointer-events:none;}
+  #done{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:9px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:opacity .5s;pointer-events:none;z-index:5;}
+  #done.show{opacity:1;}
+
+  /* artworks switcher (populated from art/manifest.js) */
+  #gallery{position:fixed;right:20px;bottom:64px;background:#fff;border:1px solid #d7dbe0;border-radius:14px;
+    padding:8px;z-index:7;box-shadow:0 8px 28px rgba(0,0,0,.12);display:none;max-height:60vh;overflow:auto;
+    min-width:240px;max-width:calc(100vw - 40px);}
+  #gallery.open{display:block;}
+  .galItem{display:flex;gap:10px;align-items:center;padding:7px 9px;border-radius:10px;text-decoration:none;color:var(--ink);}
+  .galItem:hover{background:#f2f4f6;}
+  .galItem.current{outline:2px solid var(--accent);}
+  .galCover{width:34px;height:46px;border-radius:4px;background:#e8ebee;flex:0 0 auto;display:flex;
+    align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--muted);overflow:hidden;}
+  .galCover img{width:100%;height:100%;object-fit:cover;display:block;}
+  .galTitle{font-size:13px;font-weight:700;}
+  .galBook{font-size:11px;color:var(--muted);}
+
+  /* book card shown at the completion moment */
+  #bookCard{position:fixed;left:50%;bottom:118px;transform:translateX(-50%);display:flex;gap:12px;align-items:center;
+    background:#fff;border:1px solid #d7dbe0;border-radius:14px;padding:10px 14px;opacity:0;transition:opacity .5s;
+    pointer-events:none;z-index:5;box-shadow:0 4px 18px rgba(0,0,0,.1);}
+  #bookCard.show{opacity:1;pointer-events:auto;}
+  #bookCard .galCover{width:44px;height:60px;font-size:18px;}
+  .bcFrom{font-size:11px;color:var(--muted);}
+  .bcBook{font-size:13px;font-weight:700;max-width:240px;}
+  .bcBuy{font-size:12px;font-weight:600;color:var(--accent);text-decoration:none;}
+  .bcBuy:hover{text-decoration:underline;}
+
+  /* ink panel */
+  #panel{position:fixed;right:20px;bottom:64px;background:#fff;border:1px solid #d7dbe0;border-radius:14px;
+    padding:12px;z-index:7;box-shadow:0 8px 28px rgba(0,0,0,.12);display:none;max-height:70vh;overflow:auto;
+    width:250px;max-width:calc(100vw - 40px);}
+  #panel.open{display:block;}
+  .pLabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:4px 4px 8px;}
+  .preset{display:flex;align-items:center;gap:10px;width:100%;padding:7px 9px;border:none;background:none;
+    border-radius:10px;cursor:pointer;font:inherit;font-size:13px;font-weight:600;color:var(--ink);text-align:left;}
+  .preset:hover{background:#f2f4f6;}
+  .preset.current{outline:2px solid var(--accent);}
+  .swatch{width:20px;height:20px;border-radius:6px;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);}
+  #panel hr{border:none;border-top:1px solid #eceff2;margin:10px 0;}
+  #wells{display:flex;gap:8px;padding:0 4px;align-items:center;}
+  .well{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--muted);}
+  .well input{width:34px;height:34px;padding:0;border:1px solid #d7dbe0;border-radius:8px;background:#fff;cursor:pointer;}
+  .well input::-webkit-color-swatch-wrapper{padding:3px;}
+  .well input::-webkit-color-swatch{border:none;border-radius:5px;}
+</style>
+</head>
+<body>
+  <div id="bar"></div>
+  <div id="hud">
+    <div id="title">Spiroglyphics <span>&middot; scroll to draw</span></div>
+    <div id="credit">Spiroglyphics &middot; by Thomas Pavitte</div>
+    <div id="count"></div>
+  </div>
+
+  <div id="track">
+    <div id="stage">
+      <svg id="art" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+
+  <div id="btns">
+    <button id="galBtn" style="display:none">Artworks</button>
+    <button id="inkBtn">Inks</button>
+    <button id="guideBtn">Hide guide</button>
+  </div>
+
+  <div id="gallery"></div>
+
+  <div id="panel">
+    <div class="pLabel">Inks</div>
+    <div id="presets"></div>
+    <hr />
+    <div class="pLabel">Your ink</div>
+    <div id="wells"></div>
+  </div>
+
+  <div id="bookCard"></div>
+  <div id="hint">Scroll to draw the line&hellip;</div>
+  <div id="done">&#10003; Complete</div>
+
+<script>
+(function(){
+  if("scrollRestoration" in history) history.scrollRestoration="manual";
+  window.scrollTo(0,0);
+  window.addEventListener("load",()=>window.scrollTo(0,0));
+
+  const svgNS="http://www.w3.org/2000/svg";
+  const art=document.getElementById("art");
+  const bar=document.getElementById("bar");
+  const count=document.getElementById("count");
+  const hint=document.getElementById("hint");
+  const done=document.getElementById("done");
+  const bookCard=document.getElementById("bookCard");
+
+  /* ---------- ink presets ---------- */
+  const INKS=[
+    {name:"Ink",     hex:"#231f20"},
+    {name:"Sepia",   hex:"#6b4226"},
+    {name:"Indigo",  hex:"#2b3a67"},
+    {name:"Crimson", hex:"#8e2434"},
+    {name:"Forest",  hex:"#2f5d3a"}
+  ];
+
+  /* ---------- SVG helpers ---------- */
+  async function loadSvg(url){
+    const res=await fetch(url);
+    if(!res.ok) throw new Error(url+" -> "+res.status);
+    return new DOMParser().parseFromString(await res.text(),"image/svg+xml").documentElement;
+  }
+  const firstPathD=root=>{
+    const p=root.querySelector("path");
+    return p?p.getAttribute("d"):null;
+  };
+
+  // How many times the spiral winds around its centre — gives the HUD counter
+  // its unit ("Loop 12 / 34"). Sampled once per artwork from the centreline.
+  function buildWinding(pathEl,samples){
+    const L=pathEl.getTotalLength();
+    const pts=[];
+    for(let i=0;i<=samples;i++)pts.push(pathEl.getPointAtLength(L*i/samples));
+    let cx=0,cy=0;
+    for(const pt of pts){cx+=pt.x;cy+=pt.y;}
+    cx/=pts.length;cy/=pts.length;
+    const wind=[0];
+    let acc=0,prev=Math.atan2(pts[0].y-cy,pts[0].x-cx);
+    for(let i=1;i<pts.length;i++){
+      const a=Math.atan2(pts[i].y-cy,pts[i].x-cx);
+      let d=a-prev;
+      if(d>Math.PI)d-=2*Math.PI;
+      if(d<-Math.PI)d+=2*Math.PI;
+      acc+=Math.abs(d);
+      wind.push(acc);
+      prev=a;
+    }
+    return {length:L,wind,total:Math.max(1,Math.round(acc/(2*Math.PI)))};
+  }
+
+  /* ---------- boot one artwork ---------- */
+  async function boot(entry,list){
+    const dir="art/"+entry.id+"/";
+    const [imageRoot,lineRoot]=await Promise.all([
+      loadSvg(dir+"image.svg"),loadSvg(dir+"line.svg")
+    ]);
+    const imageD=firstPathD(imageRoot),lineD=firstPathD(lineRoot);
+    if(!imageD||!lineD)throw new Error("art files for '"+entry.id+"' need one <path> each");
+
+    // stage geometry from the image export (both files share the artboard)
+    const vb=(imageRoot.getAttribute("viewBox")||"0 0 1080 1080").split(/[\s,]+/).map(Number);
+    art.setAttribute("viewBox",vb.join(" "));
+    art.style.setProperty("--ar",vb[2]/vb[3]);
+    const PEN=entry.pen||15;
+
+    // reveal mask: a stroke that travels along the spiral centreline
+    const defs=document.createElementNS(svgNS,"defs");
+    const mask=document.createElementNS(svgNS,"mask");
+    mask.setAttribute("id","reveal");
+    const maskPath=document.createElementNS(svgNS,"path");
+    maskPath.setAttribute("d",lineD);
+    maskPath.setAttribute("fill","none");
+    maskPath.setAttribute("stroke","#fff");
+    maskPath.setAttribute("stroke-width",PEN);
+    maskPath.setAttribute("stroke-linecap","round");
+    maskPath.setAttribute("stroke-linejoin","round");
+    mask.appendChild(maskPath);
+    defs.appendChild(mask);
+    art.appendChild(defs);
+
+    // layer 1: the printed grey guide (the page of the book)
+    const ghost=document.createElementNS(svgNS,"path");
+    ghost.setAttribute("id","ghost");
+    ghost.setAttribute("d",imageD);
+    art.appendChild(ghost);
+
+    // layer 2: the same shape in ink, revealed by the mask — never transformed,
+    // so the drawing stays register-accurate
+    const inkedG=document.createElementNS(svgNS,"g");
+    inkedG.setAttribute("mask","url(#reveal)");
+    const inked=document.createElementNS(svgNS,"path");
+    inked.setAttribute("id","inked");
+    inked.setAttribute("d",imageD);
+    inkedG.appendChild(inked);
+    art.appendChild(inkedG);
+
+    // layer 3: the pen nib
+    const pen=document.createElementNS(svgNS,"circle");
+    pen.setAttribute("r",PEN*0.75);
+    pen.setAttribute("fill","var(--accent)");
+    pen.setAttribute("stroke","#fff");
+    pen.setAttribute("stroke-width",PEN*0.2);
+    pen.style.opacity=0;
+    art.appendChild(pen);
+
+    const {length:L,wind,total:LOOPS}=buildWinding(maskPath,1600);
+    maskPath.setAttribute("stroke-dasharray",L+" "+L);
+    maskPath.setAttribute("stroke-dashoffset",L);
+    maskPath.style.opacity=0; // hide the round cap "dot" before drawing starts
+
+    // per-artwork HUD
+    const t=document.getElementById("title");
+    t.textContent=entry.title+" ";
+    const sp=document.createElement("span");sp.textContent="· scroll to draw";t.appendChild(sp);
+    document.getElementById("credit").textContent=entry.credit||"Spiroglyphics · by Thomas Pavitte";
+    document.title=entry.title+" · Spiroglyphics";
+    done.textContent="✓ Complete — one continuous line, "+LOOPS+" loops";
+
+    // completion book card
+    const info=list.find(a=>a.id===entry.id);
+    if(info&&info.book){
+      bookCard.appendChild(coverEl(info));
+      const tx=document.createElement("div");
+      const l1=document.createElement("div");l1.className="bcFrom";l1.textContent="From the book";
+      const l2=document.createElement("div");l2.className="bcBook";l2.textContent=info.book;
+      tx.appendChild(l1);tx.appendChild(l2);
+      if(info.buy){
+        const a=document.createElement("a");a.className="bcBuy";a.href=info.buy;
+        a.target="_blank";a.rel="noopener";a.textContent="Get the book";
+        tx.appendChild(a);
+      }
+      bookCard.appendChild(tx);
+      bookCard.dataset.ready="1";
+    }
+
+    /* ----- scroll choreography -----
+       0.00–0.02  dead zone
+       0.02–0.88  the line is drawn, outside in
+       0.90–0.96  the grey guide fades — only the inked drawing remains
+       0.92+      completion: toast + book card                         */
+    const DRAW_A=0.02,DRAW_B=0.88,FADE_A=0.90,FADE_B=0.96;
+    const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+    let ticking=false;
+
+    function update(){
+      ticking=false;
+      const max=document.getElementById("track").offsetHeight-window.innerHeight;
+      const p=max>0?clamp(window.scrollY/max,0,1):0;
+      bar.style.width=(p*100).toFixed(2)+"%";
+
+      const dr=clamp((p-DRAW_A)/(DRAW_B-DRAW_A),0,1);
+      maskPath.setAttribute("stroke-dashoffset",L*(1-dr));
+      maskPath.style.opacity=dr>0.0005?1:0;
+
+      const nib=maskPath.getPointAtLength(L*dr);
+      pen.setAttribute("cx",nib.x);pen.setAttribute("cy",nib.y);
+      pen.style.opacity=(dr>0.0005&&dr<1)?1:0;
+
+      ghost.style.opacity=1-clamp((p-FADE_A)/(FADE_B-FADE_A),0,1);
+
+      const li=Math.min(wind.length-1,Math.round(dr*(wind.length-1)));
+      const loop=Math.min(LOOPS,Math.floor(wind[li]/(2*Math.PI))+(dr>0?1:0));
+      count.textContent="Loop "+(dr>=1?LOOPS:loop)+" / "+LOOPS;
+
+      done.classList.toggle("show",p>0.92);
+      bookCard.classList.toggle("show",p>0.92&&bookCard.dataset.ready==="1");
+      if(p>0.9){hint.textContent="Try your own ink ↘";hint.style.opacity=1;}
+      else hint.style.opacity=p>0.02?0:1;
+    }
+    addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(update);}},{passive:true});
+    addEventListener("resize",update);
+    update();
+
+    buildInkPanel();
+  }
+
+  /* ---------- ink panel ---------- */
+  function buildInkPanel(){
+    const presetsEl=document.getElementById("presets");
+    const wellsEl=document.getElementById("wells");
+    let ink=INKS[0].hex;
+    let well;
+
+    function applyInk(){
+      document.documentElement.style.setProperty("--spiro-ink",ink);
+      well.value=ink;
+      [...presetsEl.children].forEach(btn=>{
+        btn.classList.toggle("current",btn.dataset.hex===ink);
+      });
+    }
+    for(const pr of INKS){
+      const b=document.createElement("button");
+      b.className="preset";
+      b.dataset.hex=pr.hex;
+      const sw=document.createElement("span");
+      sw.className="swatch";sw.style.background=pr.hex;
+      b.appendChild(sw);
+      b.appendChild(document.createTextNode(pr.name));
+      b.addEventListener("click",()=>{ink=pr.hex;applyInk();});
+      presetsEl.appendChild(b);
+    }
+    const d=document.createElement("label");
+    d.className="well";
+    well=document.createElement("input");
+    well.type="color";well.value=ink;
+    well.addEventListener("input",()=>{ink=well.value;applyInk();});
+    d.appendChild(well);
+    d.appendChild(document.createTextNode("pen"));
+    wellsEl.appendChild(d);
+    applyInk();
+  }
+
+  /* ---------- gallery / cover tiles ---------- */
+  function coverEl(a){
+    const d=document.createElement("div");d.className="galCover";
+    function letter(){
+      let n=a.book||a.title||"?";
+      if(n.indexOf(":")>-1)n=n.slice(n.lastIndexOf(":")+1);
+      d.textContent=n.trim().replace(/^The\s+/i,"").charAt(0).toUpperCase();
+    }
+    if(a.cover){
+      const img=document.createElement("img");img.src=a.cover;img.alt="";
+      img.onerror=function(){img.remove();letter();};
+      d.appendChild(img);
+    }else letter();
+    return d;
+  }
+
+  function buildGallery(list,cur){
+    const gal=document.getElementById("gallery");
+    list.forEach(a=>{
+      const item=document.createElement("a");
+      item.className="galItem"+(a.id===cur.id?" current":"");
+      item.href="?art="+encodeURIComponent(a.id);
+      item.appendChild(coverEl(a));
+      const tx=document.createElement("div");
+      const t1=document.createElement("div");t1.className="galTitle";t1.textContent=a.title;
+      const t2=document.createElement("div");t2.className="galBook";t2.textContent=a.book||"";
+      tx.appendChild(t1);tx.appendChild(t2);item.appendChild(tx);
+      gal.appendChild(item);
+    });
+    const btn=document.getElementById("galBtn");
+    btn.style.display="";
+    btn.addEventListener("click",e=>{e.stopPropagation();
+      document.getElementById("panel").classList.remove("open");
+      gal.classList.toggle("open");});
+    document.addEventListener("pointerdown",e=>{
+      if(!gal.contains(e.target)&&e.target!==btn)gal.classList.remove("open");});
+  }
+
+  /* ---------- buttons ---------- */
+  const panel=document.getElementById("panel");
+  const inkBtn=document.getElementById("inkBtn");
+  inkBtn.addEventListener("click",e=>{e.stopPropagation();
+    document.getElementById("gallery").classList.remove("open");
+    panel.classList.toggle("open");});
+  document.addEventListener("pointerdown",e=>{
+    if(!panel.contains(e.target)&&e.target!==inkBtn)panel.classList.remove("open");});
+  document.getElementById("guideBtn").addEventListener("click",e=>{
+    const off=document.body.classList.toggle("noguide");
+    e.target.textContent=off?"Show guide":"Hide guide";
+  });
+
+  /* ---------- manifest + start ---------- */
+  const FALLBACK=[{id:"elvis",title:"Elvis",book:"Spiroglyphics",cover:"covers/spiroglyphics.jpg"}];
+  function start(list){
+    const param=(new URLSearchParams(location.search).get("art")||"").toLowerCase();
+    const entry=(/^[a-z0-9-]+$/.test(param)&&list.find(a=>a.id===param))||list[0];
+    buildGallery(list,entry);
+    boot(entry,list).catch(err=>{
+      console.error(err);
+      if(location.protocol==="file:"){
+        count.textContent="Needs a local server";
+        hint.textContent="Browsers block loading the art files from file:// — run a static server (e.g. python3 -m http.server) in this folder and open it via http://localhost";
+      }else{
+        count.textContent="Couldn't load artwork";
+        hint.textContent="Check that art/"+entry.id+"/image.svg and line.svg exist";
+      }
+    });
+  }
+  const s=document.createElement("script");
+  s.src="art/manifest.js";
+  s.onload=()=>start(Array.isArray(window.SPIRO_MANIFEST)&&window.SPIRO_MANIFEST.length?window.SPIRO_MANIFEST:FALLBACK);
+  s.onerror=()=>start(FALLBACK);
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
