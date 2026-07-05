@@ -85,6 +85,10 @@
   .well input{width:44px;height:44px;padding:0;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;}
   .well input::-webkit-color-swatch-wrapper{padding:3px;}
   .well input::-webkit-color-swatch{border:none;border-radius:5px;}
+  #shuffleBtn{display:block;width:100%;margin-top:12px;font:inherit;font-size:13px;font-weight:600;
+    color:var(--ink);background:none;border:1px solid var(--border);border-radius:10px;
+    padding:7px 12px;cursor:pointer;}
+  #shuffleBtn:hover{border-color:var(--accent);color:var(--accent);}
 </style>
 </head>
 <body>
@@ -112,6 +116,7 @@
   <div id="panel">
     <div class="pLabel">Colours</div>
     <div id="wells"></div>
+    <button id="shuffleBtn">Shuffle colours</button>
   </div>
 
   <div id="bookCard"></div>
@@ -154,13 +159,14 @@
     root.style.setProperty("--ghost",mix(bgCol,dark?"#ffffff":"#000000",0.09));
     document.body.classList.toggle("dark",dark);
   }
-  // fresh pairing on every load: a quiet page, a confident line
-  (function(){
-    const dark=Math.random()<0.5;
-    bgCol=hslHex(Math.random()*360,18+Math.random()*45,dark?10+Math.random()*10:86+Math.random()*9);
-    lineCol=hslHex(Math.random()*360,40+Math.random()*45,dark?76+Math.random()*14:16+Math.random()*16);
-    applyColours();
-  })();
+  // fresh pairing on every load and on Shuffle: always a light page (10–40%
+  // dark) with a dark line (50–100% dark); saturation is free to roam.
+  // The UI still flips dark if a dark background is picked by hand.
+  function randomPair(){
+    bgCol=hslHex(Math.random()*360,Math.random()*100,60+Math.random()*30);
+    lineCol=hslHex(Math.random()*360,Math.random()*100,5+Math.random()*45);
+  }
+  randomPair();applyColours();
 
   /* ---------- SVG helpers ---------- */
   async function loadSvg(url){
@@ -386,21 +392,27 @@
     buildColourPanel();
   }
 
-  /* ---------- colours panel: two wells, nothing else ---------- */
+  /* ---------- colours panel: two wells and a shuffle ---------- */
   function buildColourPanel(){
     const wellsEl=document.getElementById("wells");
-    function makeWell(label,value,onChange){
+    const wells=[];
+    function makeWell(label,get,set){
       const d=document.createElement("label");
       d.className="well";
       const inp=document.createElement("input");
-      inp.type="color";inp.value=value;
-      inp.addEventListener("input",()=>{onChange(inp.value);applyColours();});
+      inp.type="color";inp.value=get();
+      inp.addEventListener("input",()=>{set(inp.value);applyColours();});
       d.appendChild(inp);
       d.appendChild(document.createTextNode(label));
       wellsEl.appendChild(d);
+      wells.push({inp,get});
     }
-    makeWell("line",lineCol,v=>lineCol=v);
-    makeWell("background",bgCol,v=>bgCol=v);
+    makeWell("line",()=>lineCol,v=>lineCol=v);
+    makeWell("background",()=>bgCol,v=>bgCol=v);
+    document.getElementById("shuffleBtn").addEventListener("click",()=>{
+      randomPair();applyColours();
+      wells.forEach(w=>w.inp.value=w.get());
+    });
   }
 
   /* ---------- gallery / cover tiles ---------- */
