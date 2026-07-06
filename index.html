@@ -89,6 +89,20 @@
     color:var(--ink);background:none;border:1px solid var(--border);border-radius:10px;
     padding:7px 12px;cursor:pointer;}
   #shuffleBtn:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* "from a distance" mini — a live <use> mirror of #artRoot */
+  #mini{position:fixed;left:20px;bottom:22px;width:140px;z-index:4;cursor:pointer;
+    opacity:0;pointer-events:none;transition:opacity .5s,width .3s ease;}
+  #mini.show{opacity:1;pointer-events:auto;}
+  #mini.big{width:280px;}
+  #miniSvg{display:block;width:100%;height:auto;background:var(--bg);
+    border:1px solid var(--border);border-radius:10px;}
+  #miniLabel{font-size:11px;color:var(--muted);text-align:center;margin-top:5px;}
+  @media (max-width:600px){
+    #mini{width:92px;left:16px;bottom:60px;}   /* clears the centred hint */
+    #mini.big{width:180px;}
+    #miniLabel{display:none;}
+  }
 </style>
 </head>
 <body>
@@ -119,6 +133,11 @@
     <button id="shuffleBtn">Shuffle colours</button>
   </div>
 
+  <div id="mini" title="How it looks from a distance">
+    <svg id="miniSvg" xmlns="http://www.w3.org/2000/svg"><use href="#artRoot"/></svg>
+    <div id="miniLabel">from a distance</div>
+  </div>
+
   <div id="bookCard"></div>
   <div id="hint">Scroll to draw the line&hellip;</div>
   <div id="done">&#10003; Complete</div>
@@ -136,6 +155,8 @@
   const hint=document.getElementById("hint");
   const done=document.getElementById("done");
   const bookCard=document.getElementById("bookCard");
+  const mini=document.getElementById("mini");
+  mini.addEventListener("click",()=>mini.classList.toggle("big"));
 
   /* ---------- the two user colours: the page and the line ---------- */
   const root=document.documentElement;
@@ -275,6 +296,13 @@
     art.style.setProperty("--ar",vb[2]/vb[3]);
     const PEN=entry.pen||15;
 
+    // everything lives inside #artRoot so the "from a distance" mini can
+    // mirror the whole artwork with a single live <use> clone
+    const artRoot=document.createElementNS(svgNS,"g");
+    artRoot.setAttribute("id","artRoot");
+    art.appendChild(artRoot);
+    document.getElementById("miniSvg").setAttribute("viewBox",vb.join(" "));
+
     // reveal mask: a stroke that travels along the spiral centreline
     const defs=document.createElementNS(svgNS,"defs");
     const mask=document.createElementNS(svgNS,"mask");
@@ -288,13 +316,13 @@
     maskPath.setAttribute("stroke-linejoin","round");
     mask.appendChild(maskPath);
     defs.appendChild(mask);
-    art.appendChild(defs);
+    artRoot.appendChild(defs);
 
     // layer 1: the printed grey guide (the page of the book)
     const ghost=document.createElementNS(svgNS,"path");
     ghost.setAttribute("id","ghost");
     ghost.setAttribute("d",imageD);
-    art.appendChild(ghost);
+    artRoot.appendChild(ghost);
 
     // layer 2: the same shape in ink, revealed by the mask — never transformed,
     // so the drawing stays register-accurate
@@ -304,7 +332,7 @@
     inked.setAttribute("id","inked");
     inked.setAttribute("d",imageD);
     inkedG.appendChild(inked);
-    art.appendChild(inkedG);
+    artRoot.appendChild(inkedG);
 
     // layer 3: the pen nib
     const pen=document.createElementNS(svgNS,"circle");
@@ -313,7 +341,7 @@
     pen.style.stroke="var(--bg)"; // ring in the page colour separates nib from inked line
     pen.setAttribute("stroke-width",PEN*0.2);
     pen.style.opacity=0;
-    art.appendChild(pen);
+    artRoot.appendChild(pen);
 
     let geo;
     try{geo=buildGeometry(lineD,12);}
@@ -356,8 +384,10 @@
        0.00–0.02  dead zone
        0.02–0.88  the line is drawn, outside in
        0.90–0.96  the grey guide fades — only the inked drawing remains
-       0.92+      completion: toast + book card                         */
+       0.92+      completion: toast + book card
+       0.92–0.99  step-back finale: the piece scales down to distance size */
     const DRAW_A=0.02,DRAW_B=0.88,FADE_A=0.90,FADE_B=0.96;
+    const MINI_A=0.20,SHRINK_A=0.92,SHRINK_B=0.99;
     const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
     let ticking=false;
 
@@ -379,6 +409,11 @@
 
       const loop=Math.min(LOOPS,Math.floor(nib.wind/(2*Math.PI))+(dr>0?1:0));
       count.textContent="Loop "+(dr>=1?LOOPS:loop)+" / "+LOOPS;
+
+      // mini appears once the portrait starts resolving; bows out for the finale
+      mini.classList.toggle("show",p>MINI_A&&p<SHRINK_A);
+      const shrink=clamp((p-SHRINK_A)/(SHRINK_B-SHRINK_A),0,1);
+      art.style.transform=shrink>0?"scale("+(1-shrink*0.62).toFixed(4)+")":"";
 
       done.classList.toggle("show",p>0.92);
       bookCard.classList.toggle("show",p>0.92&&bookCard.dataset.ready==="1");
