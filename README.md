@@ -51,6 +51,17 @@ entry, no code edits.
      (`fill:none`, stroked). This is the path the pen follows.
 
    Both files must share the same artboard / `viewBox` so they line up.
+
+   **Only have the filled artwork?** Generate the centreline from it:
+
+   ```sh
+   node tools/derive-centreline.js art/<id>/image.svg art/<id>/line.svg
+   ```
+
+   It ray-casts the filled spiral from its centre, traces the band midpoints
+   into the two arms, and writes the centreline (it also prints a suggested
+   `pen` width for the manifest entry). Works on the machine-generated
+   double-spirals used in the books.
 2. Add an entry to `art/manifest.js` (order there = order in the switcher):
 
    ```js

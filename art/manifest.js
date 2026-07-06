@@ -7,6 +7,8 @@
 //        line.svg  — the same spiral as ONE plain centreline path
 //                    (fill:none, stroked) — this is the path the pen follows
 //      Both files must share the same artboard/viewBox so they register.
+//      Only have image.svg? Generate the centreline from it:
+//        node tools/derive-centreline.js art/<id>/image.svg art/<id>/line.svg
 //   2. Add an entry below (order here = order in the switcher).
 //   3. Drop the book cover image into covers/ — `cover` is optional; a lettered
 //      tile is shown while the image file is missing. `buy` (optional) adds a
@@ -24,6 +26,15 @@ window.SPIRO_MANIFEST = [
     title: "Elvis",
     book: "Spiroglyphics",
     cover: "covers/spiroglyphics.jpg",
+    buy: ""
+  },
+  {
+    id: "snape",
+    title: "Snape",
+    book: "Harry Potter Spiroglyphics",
+    cover: "covers/harry-potter-spiroglyphics.jpg",
+    credit: "Harry Potter Spiroglyphics · by Thomas Pavitte",
+    pen: 10,
     buy: ""
   }
 ];
