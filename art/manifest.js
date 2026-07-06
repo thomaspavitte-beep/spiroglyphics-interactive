@@ -24,17 +24,19 @@ window.SPIRO_MANIFEST = [
   {
     id: "elvis",
     title: "Elvis",
-    book: "Spiroglyphics",
-    cover: "covers/spiroglyphics.jpg",
-    buy: ""
-  },
-  {
-    id: "snape",
-    title: "Snape",
-    book: "Harry Potter Spiroglyphics",
-    cover: "covers/harry-potter-spiroglyphics.jpg",
-    credit: "Harry Potter Spiroglyphics · by Thomas Pavitte",
-    pen: 10,
+    book: "Spiroglyphics: Rock Heroes",
+    cover: "covers/spiroglyphics-rock-heroes.jpg",
     buy: ""
   }
+  // Snape (Harry Potter Spiroglyphics) is kept on file in art/snape/ —
+  // uncomment to bring him back into the switcher:
+  // {
+  //   id: "snape",
+  //   title: "Snape",
+  //   book: "Harry Potter Spiroglyphics",
+  //   cover: "covers/harry-potter-spiroglyphics.jpg",
+  //   credit: "Harry Potter Spiroglyphics · by Thomas Pavitte",
+  //   pen: 10,
+  //   buy: ""
+  // }
 ];
