@@ -111,9 +111,7 @@
     border:1px solid var(--border);border-radius:10px;}
   #miniLabel{font-size:11px;color:var(--muted);text-align:center;margin-top:5px;}
   @media (max-width:600px){
-    #mini{width:92px;left:16px;bottom:60px;}   /* clears the centred hint */
-    #mini.big{width:180px;}
-    #miniLabel{display:none;}
+    #mini{display:none;}   /* no distance mini on mobile */
   }
 </style>
 </head>
@@ -170,6 +168,7 @@
   const bookCard=document.getElementById("bookCard");
   const cta=document.getElementById("cta");
   const mini=document.getElementById("mini");
+  const isMobile=window.matchMedia("(max-width:600px)");
   mini.addEventListener("click",()=>mini.classList.toggle("big"));
 
   /* ---------- the two user colours: the page and the line ---------- */
@@ -424,9 +423,11 @@
       const loop=Math.min(LOOPS,Math.floor(nib.wind/(2*Math.PI))+(dr>0?1:0));
       count.textContent="Loop "+(dr>=1?LOOPS:loop)+" / "+LOOPS;
 
-      // mini appears once the portrait starts resolving; bows out for the finale
-      mini.classList.toggle("show",p>MINI_A&&p<SHRINK_A);
-      const shrink=clamp((p-SHRINK_A)/(SHRINK_B-SHRINK_A),0,1);
+      // mini + step-back finale are desktop only (re-checked here so resizing
+      // across the breakpoint restores/clears them)
+      const mobile=isMobile.matches;
+      mini.classList.toggle("show",!mobile&&p>MINI_A&&p<SHRINK_A);
+      const shrink=mobile?0:clamp((p-SHRINK_A)/(SHRINK_B-SHRINK_A),0,1);
       art.style.transform=shrink>0?"scale("+(1-shrink*0.62).toFixed(4)+")":"";
 
       done.classList.toggle("show",p>0.92);
