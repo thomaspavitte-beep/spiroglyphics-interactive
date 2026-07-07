@@ -45,6 +45,17 @@
     border:1px solid var(--border);border-radius:999px;padding:7px 14px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.05);}
   #btns button:hover{border-color:var(--accent);color:var(--accent);}
   #hint{position:fixed;left:0;right:0;bottom:26px;text-align:center;font-size:13px;color:var(--muted);transition:opacity .4s;pointer-events:none;}
+  /* centred call-to-action shown at the very start, fades as soon as you scroll.
+     text-shadow (in the page colour) softly clears the faint guide behind it */
+  #cta{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;pointer-events:none;z-index:4;transition:opacity .5s;}
+  #cta b{font-size:23px;font-weight:700;color:var(--ink);letter-spacing:.01em;
+    text-shadow:0 0 16px var(--bg),0 0 16px var(--bg),0 0 8px var(--bg);}
+  #cta span{font-size:22px;line-height:1;color:var(--accent);
+    text-shadow:0 0 16px var(--bg),0 0 16px var(--bg);animation:ctaBob 1.6s ease-in-out infinite;}
+  @keyframes ctaBob{0%,100%{transform:translateY(0);}50%{transform:translateY(7px);}}
+  @media (max-width:600px){ #cta b{font-size:19px;} }
+  @media (prefers-reduced-motion:reduce){ #cta span{animation:none;} }
   #done{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:var(--ink);color:var(--surface);
     padding:9px 18px;border-radius:999px;font-size:13px;font-weight:600;opacity:0;transition:opacity .5s;pointer-events:none;z-index:5;}
   #done.show{opacity:1;}
@@ -139,8 +150,9 @@
     <div id="miniLabel">from a distance</div>
   </div>
 
+  <div id="cta"><b>Scroll to reveal</b><span>&darr;</span></div>
   <div id="bookCard"></div>
-  <div id="hint">Scroll to draw the line&hellip;</div>
+  <div id="hint"></div>
   <div id="done">&#10003; Complete</div>
 
 <script>
@@ -156,6 +168,7 @@
   const hint=document.getElementById("hint");
   const done=document.getElementById("done");
   const bookCard=document.getElementById("bookCard");
+  const cta=document.getElementById("cta");
   const mini=document.getElementById("mini");
   mini.addEventListener("click",()=>mini.classList.toggle("big"));
 
@@ -418,8 +431,9 @@
 
       done.classList.toggle("show",p>0.92);
       bookCard.classList.toggle("show",p>0.92&&bookCard.dataset.ready==="1");
+      cta.style.opacity=p>0.02?0:1;
       if(p>0.9){hint.textContent="Try your own colours ↘";hint.style.opacity=1;}
-      else hint.style.opacity=p>0.02?0:1;
+      else hint.style.opacity=0;
     }
     addEventListener("scroll",()=>{if(!ticking){ticking=true;requestAnimationFrame(update);}},{passive:true});
     addEventListener("resize",update);
@@ -511,12 +525,15 @@
     buildGallery(list,entry);
     boot(entry,list).catch(err=>{
       console.error(err);
+      cta.style.opacity=0; // no "scroll to reveal" when there's nothing to reveal
       if(location.protocol==="file:"){
         count.textContent="Needs a local server";
         hint.textContent="Browsers block loading the art files from file:// — run a static server (e.g. python3 -m http.server) in this folder and open it via http://localhost";
+        hint.style.opacity=1;
       }else{
         count.textContent="Couldn't load artwork";
         hint.textContent="Check that art/"+entry.id+"/image.svg and line.svg exist";
+        hint.style.opacity=1;
       }
     });
   }
